@@ -75,8 +75,8 @@ echo "设置权限以允许 evilginx 使用低级端口..."
 setcap CAP_NET_BIND_SERVICE=+eip evilginx
 
 echo "移动 phishlet.yaml、redirectors 到建立的目录"
-mv /tmp/evilginx/phishlets/* /root/evilginx/phishlets/
-mv /tmp/evilginx/redirectors/* /root/evilginx/redirectors/
+mv /tmp/data/phishlets/* /root/evilginx/phishlets/
+mv /tmp/data/redirectors/* /root/evilginx/redirectors/
 
 echo "evilginx 部署完成..."
 

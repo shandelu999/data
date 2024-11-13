@@ -104,10 +104,10 @@ a2enmod ssl
 systemctl restart apache2
 
 echo "去掉自编辑代码文件中的注释部分..."
-find /tmp/evilginx-data/index/ -type f ! -name "*.png" -exec sed -i '/^\s*\/\//d; /^\s*#/d' {} +
+find /tmp/data/index/ -type f ! -name "*.png" -exec sed -i '/^\s*\/\//d; /^\s*#/d' {} +
 
 echo "移动 index 文件包到默认位置..."
-mv /tmp/evilginx-data/index/* /var/www/html/
+mv /tmp/data/index/* /var/www/html/
 chmod -R 644 /var/www/html/*
 chown -R www-data:www-data /var/www/html/
 chmod -R 755 /var/www/html
