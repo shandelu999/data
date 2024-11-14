@@ -17,13 +17,13 @@ go_version="1.22.3"
 go_url="https://go.dev/dl/go${go_version}.linux-amd64.tar.gz"
 evilginx_path="/root/evilginx"
 
-echo "启用 ufw 防火墙..."
+echo "打开防火墙相应入站端口..."
 ufw enable
 ufw allow 22/tcp
 ufw allow 443/tcp
 ufw allow 53/udp
 ufw reload
-echo "ufw 防火墙入 22 443 53 入站端口均以打开..."
+echo "防火墙入站端口 22 443 53 均以打开..."
 
 echo "安装 python3-certbot-dns-cloudflare 以自动化申请通配符证书..."
 apt install -y python3-certbot-dns-cloudflare

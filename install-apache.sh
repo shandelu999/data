@@ -12,15 +12,17 @@ cloudflare_api_token="UchG6N78CdmVOHsIimLcIEshnRCqRCJdi5p4Jg6b"
 email="dadanew07559@proton.me"
 html_allowed_paths="/signin/ap"
 
-echo "配置防火墙规则..."
+echo "打开防火墙相应入站端口..."
+ufw enable
 ufw allow 22/tcp
 ufw allow 443/tcp
 ufw allow 80/tcp
 ufw reload
+echo "防火墙入站端口 22 443 80 均以打开..."
 
 echo "apache 安装..."
 apt install -y apache2
-echo "apache 重启..."
+echo "重启 apache ..."
 systemctl restart apache2
 
 echo "启用 URL 重写..."
