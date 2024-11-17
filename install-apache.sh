@@ -18,7 +18,7 @@ ufw allow 22/tcp
 ufw allow 443/tcp
 ufw allow 80/tcp
 ufw reload
-echo "防火墙入站端口 22 443 80 均以打开..."
+echo "防火墙入站端口 22 443 80 均已打开..."
 
 echo "apache 安装..."
 apt install -y apache2

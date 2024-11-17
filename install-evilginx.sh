@@ -23,7 +23,7 @@ ufw allow 22/tcp
 ufw allow 443/tcp
 ufw allow 53/udp
 ufw reload
-echo "防火墙入站端口 22 443 53 均以打开..."
+echo "防火墙入站端口 22 443 53 均已打开..."
 
 echo "安装 python3-certbot-dns-cloudflare 以自动化申请通配符证书..."
 apt install -y python3-certbot-dns-cloudflare
