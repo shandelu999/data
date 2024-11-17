@@ -16,9 +16,7 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# 更新系统和安装插件
-apt update
-apt upgrade -y
+# 安装插件
 apt install -y postfix mailutils opendkim opendkim-tools certbot python3-certbot libsasl2-2 sasl2-bin libsasl2-modules
 
 # 打开防火墙相应入站端口
