@@ -18,6 +18,7 @@ apt install -y ufw postfix mailutils opendkim opendkim-tools certbot python3-cer
 
 # 打开防火墙相应入站端口
 ufw enable
+ufw allow 22/tcp
 ufw allow 25/tcp
 ufw allow 587/tcp
 ufw allow 465/tcp
