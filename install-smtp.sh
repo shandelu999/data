@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# 基本变量定义
 domain="awsonling.store"                        # 服务器根域名
 mail_domain="mail.$domain"                      # 邮件服务器的完整子域名（FQDN）
 email="dadanew07559@proton.me"                  # Let's Encrypt 证书通知邮箱
@@ -8,18 +9,19 @@ smtp_username="bihande"                         # 客户端登陆 smtp 服务器
 smtp_password="momobihande"                     # 客户端登陆 smtp 服务器的密码
 opendkim_dir="/etc/opendkim/keys/$mail_domain"
 
-# 修改 vps 主机名为邮件服务器完整子域名，以修正发件人为：@$mail_domain 
-hostnamectl set-hostname "$mail_domai
+# 修改 VPS 主机名
+hostnamectl set-hostname "$mail_domain"
 
+# 检查 root 权限
 if [ "$(id -u)" -ne 0 ]; then
-    echo "已检查到当前为非 root 身份，已中断脚本执行。请以 root 用户身份再次运行此脚本。root 身份获取命令：root -i"
+    echo "请以 root 用户身份运行此脚本！"
     exit 1
 fi
 
-# 安装插件
+# 安装必要的软件包
 apt install -y ufw postfix mailutils opendkim opendkim-tools certbot python3-certbot libsasl2-2 sasl2-bin libsasl2-modules
 
-# 打开防火墙相应入站端口
+# 配置防火墙
 ufw enable
 ufw allow 22/tcp
 ufw allow 25/tcp
@@ -52,8 +54,6 @@ postconf -e "recipient_delimiter = +"
 postconf -e "smtp_sasl_auth_enable = yes"
 postconf -e "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd"
 postconf -e "smtp_sasl_security_options = noanonymous"
-postconf -e "smtpd_tls_cert_file = /etc/letsencrypt/live/$mail_domain/fullchain.pem"
-postconf -e "smtpd_tls_key_file = /etc/letsencrypt/live/$mail_domain/privkey.pem"
 postconf -e "smtpd_tls_security_level = may"
 postconf -e "smtpd_sasl_auth_enable = yes"
 postconf -e "smtpd_tls_auth_only = yes"
@@ -67,34 +67,46 @@ sed -i '/^submission inet n/a \ \ -o smtpd_recipient_restrictions=permit_sasl_au
 sed -i '/^submission inet n/a \ \ -o smtpd_tls_auth_only=yes' /etc/postfix/master.cf
 systemctl restart postfix
 
-# 配置 openDKIM
+# 配置 OpenDKIM
 mkdir -p $opendkim_dir
 opendkim-genkey -b 2048 -d $mail_domain -D $opendkim_dir -s mail -v
 chown opendkim:opendkim $opendkim_dir/mail.private
-echo "mail._domainkey.$mail_domain $mail_domain:mail:$opendkim_dir/mail.private" | tee /etc/opendkim/KeyTable
-echo "*@$mail_domain mail._domainkey.$mail_domain" | tee /etc/opendkim/SigningTable
-echo "127.0.0.1" | tee /etc/opendkim/TrustedHosts
-echo "localhost" | tee -a /etc/opendkim/TrustedHosts
-echo "$mail_domain" | tee -a /etc/opendkim/TrustedHosts
-systemctl restart opendkim
 
-# 配置 postfix 和 DKIM 的集成
+# 使用 sed 修改或追加 OpenDKIM 配置
+conf_file="/etc/opendkim.conf"
+sed -i '/^Socket\s\+/c\Socket                  inet:127.0.0.1:8891' $conf_file
+grep -q '^KeyTable' $conf_file || echo "KeyTable                /etc/opendkim/KeyTable" >> $conf_file
+grep -q '^SigningTable' $conf_file || echo "SigningTable            /etc/opendkim/SigningTable" >> $conf_file
+grep -q '^TrustedHosts' $conf_file || echo "TrustedHosts            /etc/opendkim/TrustedHosts" >> $conf_file
+grep -q '^LogWhy' $conf_file || echo "LogWhy                  Yes" >> $conf_file
+grep -q '^Canonicalization' $conf_file || echo "Canonicalization        relaxed/simple" >> $conf_file
+grep -q '^Selector' $conf_file || echo "Selector                mail" >> $conf_file
+grep -q '^Domain' $conf_file || echo "Domain                  $mail_domain" >> $conf_file
+
+# 配置 OpenDKIM 的文件
+echo "mail._domainkey.$mail_domain $mail_domain:mail:$opendkim_dir/mail.private" > /etc/opendkim/KeyTable
+echo "*@$mail_domain mail._domainkey.$mail_domain" > /etc/opendkim/SigningTable
+echo "127.0.0.1" > /etc/opendkim/TrustedHosts
+echo "localhost" >> /etc/opendkim/TrustedHosts
+echo "$mail_domain" >> /etc/opendkim/TrustedHosts
+
+# 配置 postfix 和 OpenDKIM 的集成
 postconf -e "milter_protocol = 6"
 postconf -e "milter_default_action = accept"
 postconf -e "smtpd_milters = inet:127.0.0.1:8891"
 postconf -e "non_smtpd_milters = inet:127.0.0.1:8891"
-systemctl restart postfix
 
-# 配置 sasl 以启用客户端验证
-sh -c "echo '[$smtp_server] $smtp_username:$smtp_password' > /etc/postfix/sasl_passwd"
+# 配置 SASL 验证
+echo "[$smtp_server] $smtp_username:$smtp_password" > /etc/postfix/sasl_passwd
 postmap /etc/postfix/sasl_passwd
-echo "smtp_sasl_auth_enable = yes
-smtpd_recipient_restrictions = permit_sasl_authenticated, reject_unauth_destination
-smtpd_sender_restrictions = permit_sasl_authenticated
-smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
-smtp_sasl_security_options = noanonymous
-smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt" >> /etc/postfix/main.cf
 chmod 600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.db
 
-#重启 postfix 以应用新配置
+# 重启服务顺序
+systemctl restart opendkim
 systemctl restart postfix
+
+# 显示 DKIM 公钥
+echo "postfix 部署完成，DKIM 公钥如下："
+echo "----------------------------------------------------------------------"
+cat /etc/opendkim/keys/$mail_domain/mail.txt
+echo "----------------------------------------------------------------------"
