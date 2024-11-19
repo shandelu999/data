@@ -8,6 +8,9 @@ smtp_username="bihande"                         # 客户端登陆 smtp 服务器
 smtp_password="momobihande"                     # 客户端登陆 smtp 服务器的密码
 opendkim_dir="/etc/opendkim/keys/$mail_domain"
 
+# 修改 vps 主机名为邮件服务器完整子域名，以修正发件人为：@$mail_domain 
+hostnamectl set-hostname "$mail_domai
+
 if [ "$(id -u)" -ne 0 ]; then
     echo "已检查到当前为非 root 身份，已中断脚本执行。请以 root 用户身份再次运行此脚本。root 身份获取命令：root -i"
     exit 1
