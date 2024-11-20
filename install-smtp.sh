@@ -34,12 +34,18 @@ ufw allow 993/tcp
 ufw allow 80/tcp
 ufw reload
 
-# 申请 Let's Encrypt 证书
+# 为根域名申请 TLS 证书
+certbot certonly --non-interactive --agree-tos --email $email --preferred-challenges http -d $domain --standalone
+# 为邮件子域名申请 TLS 证书
 certbot certonly --non-interactive --agree-tos --email $email --preferred-challenges http -d $mail_domain --standalone
+# 更新邮件服务器 TLS 证书路径（支持根域名和邮件子域名）
 postconf -e "smtpd_tls_cert_file=/etc/letsencrypt/live/$mail_domain/fullchain.pem"
 postconf -e "smtpd_tls_key_file=/etc/letsencrypt/live/$mail_domain/privkey.pem"
+postconf -e "smtp_tls_cert_file=/etc/letsencrypt/live/$domain/fullchain.pem"
+postconf -e "smtp_tls_key_file=/etc/letsencrypt/live/$domain/privkey.pem"
 postconf -e "smtpd_use_tls=yes"
 postconf -e "smtpd_tls_auth_only=yes"
+# 重启 Postfix 服务以应用新配置
 systemctl restart postfix
 
 # 配置 postfix main.cf 文件
