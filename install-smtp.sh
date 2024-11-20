@@ -56,48 +56,34 @@ postconf -e "smtpd_tls_auth_only=yes"
 # 重启 Postfix 服务以应用新配置
 systemctl restart postfix
 
-# 配置 postfix main.cf 文件
-postconf -e "myhostname = $mail_domain"
-postconf -e "mydomain = $domain"
-postconf -e "myorigin = \$mydomain"
-postconf -e "inet_interfaces = all"
-postconf -e "inet_protocols = all"
-postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain"
-postconf -e "mailbox_size_limit = 0"
-postconf -e "recipient_delimiter = +"
-postconf -e "smtp_sasl_auth_enable = yes"
-postconf -e "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd"
-postconf -e "smtp_sasl_security_options = noanonymous"
-postconf -e "smtpd_tls_security_level = may"
-postconf -e "smtpd_sasl_auth_enable = yes"
-postconf -e "smtpd_tls_auth_only = yes"
-systemctl restart postfix
-
-# 配置 postfix master.cf 文件
-sed -i '/^#submission inet n/ s/^#//' /etc/postfix/master.cf
-sed -i '/^submission inet n/a \ \ -o smtpd_tls_security_level=encrypt' /etc/postfix/master.cf
-sed -i '/^submission inet n/a \ \ -o smtpd_sasl_auth_enable=yes' /etc/postfix/master.cf
-sed -i '/^submission inet n/a \ \ -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject' /etc/postfix/master.cf
-sed -i '/^submission inet n/a \ \ -o smtpd_tls_auth_only=yes' /etc/postfix/master.cf
-systemctl restart postfix
-
 # 配置 OpenDKIM
 mkdir -p $opendkim_dir
 opendkim-genkey -b 2048 -d $mail_domain -D $opendkim_dir -s mail -v
-chown opendkim:opendkim $opendkim_dir/mail.private
+chown opendkim:opendkim $opendkim_dir/*
+chmod 600 $opendkim_dir/*
 
-# 使用 sed 修改或追加 OpenDKIM 配置
-conf_file="/etc/opendkim.conf"
-sed -i '/^Socket\s\+/c\Socket                  inet:127.0.0.1:8891' $conf_file
-grep -q '^KeyTable' $conf_file || echo "KeyTable                /etc/opendkim/KeyTable" >> $conf_file
-grep -q '^SigningTable' $conf_file || echo "SigningTable            /etc/opendkim/SigningTable" >> $conf_file
-grep -q '^TrustedHosts' $conf_file || echo "TrustedHosts            /etc/opendkim/TrustedHosts" >> $conf_file
-grep -q '^LogWhy' $conf_file || echo "LogWhy                  Yes" >> $conf_file
-grep -q '^Canonicalization' $conf_file || echo "Canonicalization        relaxed/simple" >> $conf_file
-grep -q '^Selector' $conf_file || echo "Selector                mail" >> $conf_file
-grep -q '^Domain' $conf_file || echo "Domain                  $mail_domain" >> $conf_file
+# 确保 /run/opendkim 目录存在
+mkdir -p /run/opendkim
+chown opendkim:opendkim /run/opendkim
+chmod 750 /run/opendkim
 
-# 配置 OpenDKIM 的文件
+# 覆盖 /etc/opendkim.conf 主配置文件
+cat <<EOT > /etc/opendkim.conf
+Syslog                  yes
+LogWhy                  yes
+Canonicalization        relaxed/simple
+ExternalIgnoreList      /etc/opendkim/TrustedHosts
+InternalHosts           /etc/opendkim/TrustedHosts
+KeyTable                /etc/opendkim/KeyTable
+SigningTable            /etc/opendkim/SigningTable
+Socket                  local:/run/opendkim/opendkim.sock
+UserID                  opendkim
+PidFile                 /run/opendkim/opendkim.pid
+Mode                    sv
+OversignHeaders         From
+EOT
+
+# 配置 /etc/opendkim/ 目录下的辅助文件（KeyTable、SigningTable、TrustedHosts）
 echo "mail._domainkey.$mail_domain $mail_domain:mail:$opendkim_dir/mail.private" > /etc/opendkim/KeyTable
 echo "*@$mail_domain mail._domainkey.$mail_domain" > /etc/opendkim/SigningTable
 echo "127.0.0.1" > /etc/opendkim/TrustedHosts
@@ -107,15 +93,16 @@ echo "$mail_domain" >> /etc/opendkim/TrustedHosts
 # 配置 postfix 和 OpenDKIM 的集成
 postconf -e "milter_protocol = 6"
 postconf -e "milter_default_action = accept"
-postconf -e "smtpd_milters = inet:127.0.0.1:8891"
-postconf -e "non_smtpd_milters = inet:127.0.0.1:8891"
+postconf -e "smtpd_milters = local:/run/opendkim/opendkim.sock"
+postconf -e "non_smtpd_milters = local:/run/opendkim/opendkim.sock"
 
 # 配置 SASL 验证
 echo "[$smtp_server] $smtp_username:$smtp_password" > /etc/postfix/sasl_passwd
 postmap /etc/postfix/sasl_passwd
 chmod 600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.db
 
-# 重启服务顺序
+# 重启服务
+systemctl daemon-reload
 systemctl restart opendkim
 systemctl restart postfix
 
