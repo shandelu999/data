@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# 检查操作系统版本
+echo "实测该脚本能完美运行于 Debian 12 系统。"
+read -p "当前系统是否为 Debian 12？输入 y 继续执行脚本，输入 n 终止脚本: " is_debian_12
+if [[ "$is_debian_12" != "y" ]]; then
+    echo "脚本已终止，请在 Debian 12 系统上运行此脚本。"
+    exit 1
+fi
+
+# 检查 root 权限
+if [ "$(id -u)" -ne 0 ]; then
+    echo "请以 root 用户身份运行此脚本！"
+    exit 1
+fi
+
 # 基本变量定义
 domain="awsonling.store"                        # 服务器根域名
 mail_domain="mail.$domain"                      # 邮件服务器的完整子域名（FQDN）
@@ -11,12 +25,6 @@ opendkim_dir="/etc/opendkim/keys/$mail_domain"
 
 # 修改 VPS 主机名
 hostnamectl set-hostname "$mail_domain"
-
-# 检查 root 权限
-if [ "$(id -u)" -ne 0 ]; then
-    echo "请以 root 用户身份运行此脚本！"
-    exit 1
-fi
 
 # 安装必要的软件包
 apt install -y ufw postfix mailutils opendkim opendkim-tools certbot python3-certbot libsasl2-2 sasl2-bin libsasl2-modules
