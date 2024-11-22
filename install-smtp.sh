@@ -84,11 +84,19 @@ OversignHeaders         From
 EOT
 
 # 配置 /etc/opendkim/ 目录下的辅助文件（KeyTable、SigningTable、TrustedHosts）
-echo "mail._domainkey.$mail_domain $mail_domain:mail:$opendkim_dir/mail.private" > /etc/opendkim/KeyTable
-echo "*@$mail_domain mail._domainkey.$mail_domain" > /etc/opendkim/SigningTable
-echo "127.0.0.1" > /etc/opendkim/TrustedHosts
-echo "localhost" >> /etc/opendkim/TrustedHosts
-echo "$mail_domain" >> /etc/opendkim/TrustedHosts
+cat <<EOT > /etc/opendkim/KeyTable
+mail._domainkey.$domain $domain:mail:$opendkim_dir/mail.private
+EOT
+
+cat <<EOT > /etc/opendkim/SigningTable
+*@mail.$domain mail._domainkey.$domain
+EOT
+
+cat <<EOT > /etc/opendkim/TrustedHosts
+127.0.0.1
+localhost
+$domain
+EOT
 
 # 配置 postfix 和 OpenDKIM 的集成
 postconf -e "milter_protocol = 6"
@@ -101,6 +109,13 @@ echo "[$smtp_server] $smtp_username:$smtp_password" > /etc/postfix/sasl_passwd
 postmap /etc/postfix/sasl_passwd
 chmod 600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.db
 
+# 配置发件人为 support@mail.$domain
+postconf -e "sender_canonical_maps = regexp:/etc/postfix/sender_canonical"
+cat <<EOT > /etc/postfix/sender_canonical
+/.*/    support@mail.$domain
+EOT
+postmap /etc/postfix/sender_canonical
+
 # 重启服务
 systemctl daemon-reload
 systemctl restart opendkim
@@ -109,5 +124,5 @@ systemctl restart postfix
 # 显示 DKIM 公钥
 echo "postfix 部署完成，DKIM 公钥如下："
 echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
-cat /etc/opendkim/keys/$mail_domain/mail.txt
+cat $opendkim_dir/mail.txt
 echo "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
