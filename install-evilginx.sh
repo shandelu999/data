@@ -1,10 +1,5 @@
 #!/bin/bash
 
-if [ "$(id -u)" -ne 0 ]; then
-    echo "已检查到当前为非 root 身份，已中断脚本执行。请以 root 用户身份再次运行此脚本。root 身份获取命令：root -i"
-    exit 1
-fi
-
 # 配置 email 变量，用于接收 Let's Encrypt 证书相关通知的电子邮件地址。
 email="dadanew07559@proton.me"
 # 配置 domain 变量，这是要获取通配符证书的主域名。
