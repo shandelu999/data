@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# 千万别改脚本！！！openDKIM 的配置及其敏感，包括：安装时机、套接字、关联软件（mailutils、postfix、certbot）安装顺序、等等。错一个，全盘错。
+# 千万别改脚本！！！该脚本已实现对邮件签发 dkim 签名。
+# 千万别改脚本！！！该脚本部署后发件人为根域 @awsonling.store 。如要挑战发件人为子域 @mail.awsonling.store，重新做一个新脚本，千万别把这个脚本改坏了！！！
+# 千万别改脚本！！！从开始部署 smtp，到如今完成该脚本，总耗时大约 20 天！！！因此，千万别改这个脚本！！！
+
 # 变量
 domain="awsonling.store"
 email="dadanew07559@proton.me"
