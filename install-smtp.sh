@@ -26,7 +26,7 @@ ufw --force enable
 ufw reload
 
 # 安装必要的软件包
-apt install -y mailutils postfix certbot opendkim opendkim-tools dovecot-core dovecot-imapd dovecot-pop3d logwatch
+apt install -y mailutils postfix certbot opendkim opendkim-tools dovecot-core dovecot-imapd dovecot-pop3d
 
 # 配置 VPS 主机名
 hostnamectl set-hostname "$domain"
@@ -254,24 +254,15 @@ echo "1. DKIM TXT 记录（在 mail._domainkey.$domain）:"
 cat /etc/opendkim/keys/$domain/mail.txt
 echo ""
 echo "2. SPF TXT 记录（在 $domain）:"
-echo "v=spf1 mx ~all"
+echo "v=spf1 ip4:xx.xx.xxx.xx ip6:xxxx:xxxx:xx:xxxx::x -all"
 echo ""
 echo "3. DMARC TXT 记录（在 _dmarc.$domain）:"
-echo "v=DMARC1; p=none; rua=mailto:postmaster@$domain"
+echo "v=DMARC1; p=reject; rua=mailto:postmaster@$domain"
 echo "========================================"
 
 # 配置 SSL 证书的自动续期
 systemctl enable certbot.timer
 systemctl start certbot.timer
 
-# 配置 Logwatch 进行日志监控
-# 配置每日报告发送到系统管理员邮箱
-sed -i "s/^MailTo = .*/MailTo = $crt_email/" /etc/logwatch/conf/logwatch.conf
-sed -i "s/^Detail = .*/Detail = High/" /etc/logwatch/conf/logwatch.conf
-
-# 安装并配置 Logwatch
-echo "安装并配置 Logwatch 完成。日志报告将每天发送到 $crt_email。"
-
-# 完成
 echo "邮件服务器配置完成！"
 echo "请确保已在 DNS 中添加 DKIM、SPF 和 DMARC 记录。"
