@@ -266,3 +266,26 @@ systemctl start certbot.timer
 
 echo "邮件服务器配置完成！"
 echo "请确保已在 DNS 中添加 DKIM、SPF 和 DMARC 记录。"
+
+
+
+
+# 更改发件人
+adduser noreply --shell /usr/sbin/nologin
+
+passwd noreply
+
+mkdir -p /home/noreply/Maildir/{cur,new,tmp}
+chown -R noreply:noreply /home/noreply/Maildir
+chmod -R 700 /home/noreply/Maildir
+
+postconf -e "home_mailbox = Maildir/"
+systemctl restart postfix
+
+
+nano /etc/postfix/main.cf
+
+myhostname = awsonling.store
+myorigin = $myhostname
+
+sudo systemctl restart postfix
