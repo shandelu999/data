@@ -5,11 +5,12 @@
 # 脚本已实现自动续订证书
 
 # 变量
-domain="awsonling.store"  # 根域名，也是发件人域名
+domain="awsonling.store"  # @ 符号右侧部分。也是根域名。也是发件人域名
+local_part="support"  # @ 符号左侧的部分。也是本地客户端登陆本 smtp 服务器时的用户名
+mail_from="$local_part@$domain"  # 邮件发送地址
+display_name="Support" # 邮件显示名。如：“Support <support@awsonling.store>”中的第一个 Support。收件人在邮件客户端中通常会优先看到 显示名，而不是纯粹的邮箱地址
 crt_email="dadanew07559@proton.me"  # 申请证书时的邮箱
-mail_name="support"  # 发件人前缀，也是本地客户端登陆本 smtp 服务器时的用户名
 password="areyoushande"  # 本地客户端登陆本 smtp 服务器时的密码（部署中涉及的其他密码，都是这个）
-sender_email="support@$domain"  # 发件人全称
 
 # 更新软件包索引以检索最新版本软件包
 apt update
@@ -218,13 +219,13 @@ echo "  driver = passwd" >> /etc/dovecot/conf.d/10-auth.conf
 echo "}" >> /etc/dovecot/conf.d/10-auth.conf
 
 # 创建邮件用户并设置密码
-useradd -m -s /usr/sbin/nologin $mail_name
-echo "$mail_name:$password" | chpasswd
+useradd -m -s /usr/sbin/nologin $local_part
+echo "$local_part:$password" | chpasswd
 
 # 创建 Maildir 目录，并赋权
-mkdir -p /home/$mail_name/Maildir/{cur,new,tmp}
-chown -R $mail_name:$mail_name /home/$mail_name/Maildir
-chmod -R 700 /home/$mail_name/Maildir
+mkdir -p /home/$local_part/Maildir/{cur,new,tmp}
+chown -R $local_part:$local_part /home/$local_part/Maildir
+chmod -R 700 /home/$local_part/Maildir
 
 # 配置 postfix 使用 dovecot 进行 SASL 认证
 postconf -e "smtpd_sasl_auth_enable = yes"
@@ -265,16 +266,15 @@ echo "========================================"
 systemctl enable certbot.timer
 systemctl start certbot.timer
 
-# 更改发件人
+
+
+# mail from 更改 support@$domain
 
 # 配置 postfix 使用 maildir 格式
 postconf -e "myorigin = \$myhostname"
 
-# 配置 postfix 重写发件人地址为 support@domain
-echo "配置 Postfix 重写发件人地址为 $sender_email..."
-
 # 创建 sender_canonical 文件
-echo "/.*/ $sender_email" > /etc/postfix/sender_canonical
+echo "/.*/ $mail_from" > /etc/postfix/sender_canonical
 
 # 设置文件权限
 chmod 644 /etc/postfix/sender_canonical
@@ -289,6 +289,27 @@ postconf -e "sender_canonical_maps = regexp:/etc/postfix/sender_canonical"
 # 重启 postfix
 systemctl restart postfix
 
-echo "邮件服务器配置完成！"
-echo "请确保已在 DNS 中添加 DKIM、SPF 和 DMARC 记录。"
-echo "发件人全称是：support@$domain"
+# display name 显示名更改
+# 由于本 smtp 的 mail from = from，因此仅更改显示名即可。否则，应该更改 /etc/postfix/generic 文件 <$local_part@$domain> 里的 $domain 部分，增加变量 $sub_domain。并重新进行 DKIM 和 DMARC。
+
+# 生成 /etc/postfix/generic 文件
+echo "root@$domain $display_name <$local_part@$domain>" > /etc/postfix/generic
+
+# 生成 Postfix 可识别的映射数据库
+postmap /etc/postfix/generic
+
+# 设置文件权限和所有者
+chmod 644 /etc/postfix/generic
+chown root:root /etc/postfix/generic
+chmod 600 /etc/postfix/generic.db
+chown root:root /etc/postfix/generic.db
+
+# 更新 Postfix 配置以使用 generic_maps
+postconf -e "smtp_generic_maps = hash:/etc/postfix/generic"
+
+# 重启 Postfix 以应用更改
+systemctl restart postfix
+
+echo "邮件服务器部署完毕"
+echo "mail from = $local_part@$domain"
+echo "from = $display_name <$local_part@$domain>"
