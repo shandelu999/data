@@ -1,14 +1,13 @@
 #!/bin/bash
 
 # openDKIM 的配置及其敏感，包括：安装时机、套接字、关联软件（mailutils、postfix、certbot）安装顺序、等等。错一个，全盘错。
-# 脚本部署后发件人为根域 @awsonling.store。如要调整发件人为子域 @mail.awsonling.store，重新做一个新脚本。
+# 脚本部署后发件人为根域。如：@awsonling.store。如要调整发件人为子域如：@mail.awsonling.store，重新做一个新脚本。
 # 脚本已实现自动续订证书
 
 # 变量
 domain="awsonling.store"  # @ 符号右侧部分。也是根域名。也是发件人域名
 local_part="support"  # @ 符号左侧的部分。也是本地客户端登陆本 smtp 服务器时的用户名
 mail_from="$local_part@$domain"  # 邮件发送地址
-display_name="Support" # 邮件显示名。如：“Support <support@awsonling.store>”中的第一个 Support。收件人在邮件客户端中通常会优先看到 显示名，而不是纯粹的邮箱地址
 crt_email="dadanew07559@proton.me"  # 申请证书时的邮箱
 password="areyoushande"  # 本地客户端登陆本 smtp 服务器时的密码（部署中涉及的其他密码，都是这个）
 
@@ -28,9 +27,13 @@ ufw allow 995/tcp   # pop3s
 ufw --force enable
 ufw reload
 
-# 安装必要的软件包
+# 依赖项
 apt install -y mailutils postfix certbot opendkim opendkim-tools dovecot-core dovecot-imapd dovecot-pop3d
-                                             
+
+
+# 基础配置
+
+
 # 配置 vps 主机名
 hostnamectl set-hostname "$domain"
 
@@ -48,11 +51,19 @@ EOF
 postconf -e "inet_interfaces = all"
 postconf -e "myhostname = $domain"
 postconf -e "home_mailbox = Maildir/"
-# 重启 postfix 以生效配置
+# 重启以生效配置
 systemctl restart postfix
+
+
+# 证书
+
 
 # 申请证书
 certbot certonly --non-interactive --agree-tos --email $crt_email --preferred-challenges http -d $domain --standalone
+
+# 配置 SSL 证书的自动续期
+systemctl enable certbot.timer
+systemctl start certbot.timer
 
 # postfix 启用证书
 postconf -e "smtpd_tls_cert_file=/etc/letsencrypt/live/$domain/fullchain.pem"
@@ -61,7 +72,9 @@ postconf -e "smtpd_use_tls=yes"
 postconf -e "smtpd_tls_security_level=may"
 systemctl restart postfix
 
-# openDKIM 配置
+
+# openDKIM
+
 
 # 清空 opendkim.conf 原配置
 truncate -s 0 /etc/opendkim.conf
@@ -113,7 +126,7 @@ chown -R opendkim:opendkim /etc/opendkim/keys/$domain
 find /etc/opendkim/keys/$domain -type d -exec chmod 700 {} \;
 find /etc/opendkim/keys/$domain -type f -exec chmod 600 {} \;
 
-# 重启 openDKIM 以生效配置
+# 重启以生效配置
 systemctl restart opendkim
 
 # 配置 postfix 以通过 milter 协议调用 openDKIM
@@ -122,14 +135,15 @@ postconf -e "non_smtpd_milters = inet:127.0.0.1:8891"
 postconf -e "milter_protocol = 6"
 postconf -e "milter_default_action = accept"
 
-# 重启服务以应用 openDKIM 配置
+# 重启以生效配置
 systemctl restart opendkim
 systemctl restart postfix
 
-# 配置 SASL 以启用本地客户端连接本服务器发送和接收邮件
+
+# SASL
+
 
 # 配置 /etc/dovecot/conf.d/10-master.conf
-truncate -s 0 /etc/dovecot/conf.d/10-master.conf
 truncate -s 0 /etc/dovecot/conf.d/10-master.conf
 tee /etc/dovecot/conf.d/10-master.conf > /dev/null <<EOF
 # IMAP 登录服务
@@ -244,31 +258,13 @@ chmod o+x /etc/letsencrypt/live
 chmod o+r /etc/letsencrypt/live/$domain/fullchain.pem
 chmod o+r /etc/letsencrypt/live/$domain/privkey.pem
 
-# 重启服务以应用配置
+# 重启以生效配置
 systemctl restart postfix
 systemctl restart dovecot
 
-# 配置 DNS 记录输出（用户需手动添加）
-echo "========================================"
-echo "请手动在 DNS 提供商处添加以下记录："
-echo ""
-echo "1. DKIM TXT 记录（在 mail._domainkey.$domain）:"
-cat /etc/opendkim/keys/$domain/mail.txt
-echo ""
-echo "2. SPF TXT 记录（在 $domain）:"
-echo "v=spf1 ip4:xx.xx.xxx.xx ip6:xxxx:xxxx:xx:xxxx::x -all"
-echo ""
-echo "3. DMARC TXT 记录（在 _dmarc.$domain）:"
-echo "v=DMARC1; p=reject; rua=mailto:postmaster@$domain"
-echo "========================================"
 
-# 配置 SSL 证书的自动续期
-systemctl enable certbot.timer
-systemctl start certbot.timer
+# mail from 更改
 
-
-
-# mail from 更改 support@$domain
 
 # 配置 postfix 使用 maildir 格式
 postconf -e "myorigin = \$myhostname"
@@ -286,30 +282,28 @@ postmap /etc/postfix/sender_canonical
 # 更新 postfix 配置
 postconf -e "sender_canonical_maps = regexp:/etc/postfix/sender_canonical"
 
-# 重启 postfix
+# 重启以生效配置
 systemctl restart postfix
 
-# display name 显示名更改
-# 由于本 smtp 的 mail from = from，因此仅更改显示名即可。否则，应该更改 /etc/postfix/generic 文件 <$local_part@$domain> 里的 $domain 部分，增加变量 $sub_domain。并重新进行 DKIM 和 DMARC。
 
-# 生成 /etc/postfix/generic 文件
-echo "root@$domain $display_name <$local_part@$domain>" > /etc/postfix/generic
+# 打印
 
-# 生成 Postfix 可识别的映射数据库
-postmap /etc/postfix/generic
 
-# 设置文件权限和所有者
-chmod 644 /etc/postfix/generic
-chown root:root /etc/postfix/generic
-chmod 600 /etc/postfix/generic.db
-chown root:root /etc/postfix/generic.db
-
-# 更新 Postfix 配置以使用 generic_maps
-postconf -e "smtp_generic_maps = hash:/etc/postfix/generic"
-
-# 重启 Postfix 以应用更改
-systemctl restart postfix
-
-echo "邮件服务器部署完毕"
+# DNS 记录
+echo "============================================================================"
+echo ""
+echo "DKIM TXT 记录，host = mail._domainkey.$domain"
+cat /etc/opendkim/keys/$domain/mail.txt
+echo ""
+echo "SPF TXT 记录，host = $domain"
+echo "v=spf1 ip4:xx.xx.xxx.xx ip6:xxxx:xxxx:xx:xxxx::x -all"
+echo ""
+echo "DMARC TXT 记录，host = _dmarc.$domain"
+echo "v=DMARC1; p=reject; rua=mailto:postmaster@$domain"
+echo ""
+echo "============================================================================"
 echo "mail from = $local_part@$domain"
-echo "from = $display_name <$local_part@$domain>"
+echo "from = $local_part@$domain"
+echo "邮件显示名，如：“Support <support@awsonling.store>”中的第一个 Support，在发件时指定"
+echo "============================================================================"
+echo "部署完毕"
