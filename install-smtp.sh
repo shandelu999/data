@@ -5,11 +5,11 @@
 # 脚本已实现自动续订证书
 
 # 变量
-domain="awsonling.store"  # @ 符号右侧部分。也是根域名。也是发件人域名
+domain="awsonling.onling"  # @ 符号右侧部分。也是根域名。也是发件人域名
 local_part="support"  # @ 符号左侧的部分。也是本地客户端登陆本 smtp 服务器时的用户名
 mail_from="$local_part@$domain"  # 邮件发送地址
 crt_email="dadanew07559@proton.me"  # 申请证书时的邮箱
-password="areyoushande"  # 本地客户端登陆本 smtp 服务器时的密码（部署中涉及的其他密码，都是这个）
+password="areyoushan"  # 本地客户端登陆本 smtp 服务器时的密码（部署中涉及的其他密码，都是这个）
 
 # 更新软件包索引以检索最新版本软件包
 apt update
