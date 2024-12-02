@@ -1,11 +1,10 @@
 #!/bin/bash
 
 # openDKIM 的配置及其敏感，包括：安装时机、套接字、关联软件（mailutils、postfix、certbot）安装顺序、等等。错一个，全盘错。
-# 脚本部署后发件人为根域。如：@awsonling.store。如要调整发件人为子域如：@mail.awsonling.store，重新做一个新脚本。
 # 脚本已实现自动续订证书
 
 # 变量
-domain="awsonling.online"  # @ 符号右侧部分。也是根域名。也是发件人域名
+domain="mail.awsonling.online"  # @ 符号右侧部分。也是发件人域名
 local_part="support"  # @ 符号左侧的部分。也是本地客户端登陆本 smtp 服务器时的用户名
 mail_from="$local_part@$domain"  # 邮件发送地址
 crt_email="dadanew07559@proton.me"  # 申请证书时的邮箱
@@ -51,6 +50,7 @@ EOF
 postconf -e "inet_interfaces = all"
 postconf -e "myhostname = $domain"
 postconf -e "home_mailbox = Maildir/"
+postconf -e "mydestination = $myhostname, $domain, localhost"
 # 重启以生效配置
 systemctl restart postfix
 
@@ -140,7 +140,7 @@ systemctl restart opendkim
 systemctl restart postfix
 
 
-# SASL
+# SASL-dovecot
 
 
 # 配置 /etc/dovecot/conf.d/10-master.conf
@@ -304,7 +304,7 @@ echo ""
 echo "============================================================================"
 echo "mail from = $local_part@$domain"
 echo "from = $local_part@$domain"
-echo "邮件显示名，如：“Support <support@awsonling.store>”中的第一个 Support，在发件时指定"
+echo "邮件显示名，如：“Support <support@$domain>”中的第一个 Support，在发件时指定"
 echo "============================================================================"
 echo "部署完毕"
 
